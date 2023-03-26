@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+    <head>
+
+    </head>
+
+    <body>
+
+        <?php
+            //Ključ za enkripciju, 256 bitni
+            $encryption_key = md5('jed4n j4k0 v3l1k1 kljuc');
+            //Odaber cipher metodu AES
+            $cipher = 'AES-128-CTR';
+            //Stvori IV sa ispravnom dužinom
+            $iv_length = openssl_cipher_iv_length($m);
+            $options = 0;
+            $encryption_iv = random_bytes($iv_length);
+
+            $db = new mysqli("localhost", "root", "", "lv2");
+            if ($db->connect_error) {
+                die("Connection failed: " . $db->connect_error);
+            }
+            
+            $targetDir = "uploads/";
+            $fileName = basename($_FILES["file"]["name"]);
+            $targetFilePath = $targetDir . $fileName;
+            $fileType = pathinfo($targetFilePath, PATHINFO_EXTENSION);
+            
+            if(isset($_POST["submit"]) && !empty($_FILES["file"]["name"])){
+                $allowTypes = array('jpg','png','jpeg','pdf');
+                if(in_array($fileType, $allowTypes)){
+                    if(move_uploaded_file($_FILES["file"]["tmp_name"], $targetFilePath)){
+                        //Kriptiraj podatke sa openssl
+                        $data = $fileName
+                        $data = openssl_encrypt($data , $cipher, $encryption_key, $options , $encryption_iv );
+                        //Spremi podatke
+                        $_SESSION['podaci'] = base64_encode($data);
+                        $_SESSION['iv'] = $encryption_iv;
+
+                        //Ispiši kriptirane podatke
+                        echo '<p>Kriptirani podaci su ' . base64_encode($data) .'.</p>';
+
+                        $insert = $db->query("INSERT INTO files (file) VALUES ('$data')"); 
+                        if($insert){
+                            $statusMsg = "Upload successful";
+                        }else{
+                            $statusMsg = "Failed";
+                        } 
+                    }else{
+                        $statusMsg = "Error";
+                    }
+                }else{
+                    $statusMsg = 'Invalid file format';
+                }
+            }else{
+                $statusMsg = 'Select a file.';
+            }
+            echo $statusMsg;
+
+
+
+            /*Dekripcija podataka sa OpenSSL*/
+
+
+            //Postoje li kriptirani podaci
+            if (isset($_SESSION['podaci'], $_SESSION['iv'])) {
+                //Stvori ključ
+                $decryption_key = md5('jed4n j4k0 v3l1k1 kljuc');
+                //Dohvati IV i kriptirane podatke
+                $decryption_iv = $_SESSION['iv'];
+                $decriptdata= base64_decode( $_SESSION['podaci'] );
+                $decriptdata = openssl_decrypt($decriptdata , $cipher, $decryption_key, $options , $decryption_iv );
+                //Ispiši podatke
+                echo '<p>Dekriptirani podaci su "' . trim($decriptdata) . '".</p>';
+                } else {
+                    echo '<p>Nema podataka.</p>';
+
+        ?>
+    </body>
+</html>
